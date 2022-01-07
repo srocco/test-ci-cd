@@ -98,6 +98,6 @@ workflows:
           azure_repo_url: $AZURE_REPOSITORY_DEV_URL
           filters:
             branches:
-              only: test
+              only: main
           requires:
             - build
