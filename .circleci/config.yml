@@ -116,7 +116,7 @@ workflows:
   version: 2.1
   build_and_deploy:
     jobs:
-      - unit_test
+      #- unit_test
       # - integration_test
       - build:
           requires:
