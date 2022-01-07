@@ -86,3 +86,18 @@ jobs:
 
 orbs:
   browser-tools: circleci/browser-tools@1.1.3
+
+workflows:
+  version: 2.1
+  build_and_deploy:
+    jobs:
+      - build
+
+      - publish:
+          environment: "dev"
+          azure_repo_url: $AZURE_REPOSITORY_DEV_URL
+          filters:
+            branches:
+              only: test
+          requires:
+            - build
