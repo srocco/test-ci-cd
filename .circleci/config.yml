@@ -142,13 +142,4 @@ workflows:
             - unit_test
             # - integration_test
             - build
-      - publish:
-          environment: "prod"
-          azure_repo_url: $AZURE_REPOSITORY_PROD_URL
-          filters:
-            branches:
-              only: prod
-          requires:
-            - unit_test
-            # - integration_test
-            - build
+    
