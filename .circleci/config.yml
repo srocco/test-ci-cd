@@ -53,5 +53,36 @@ jobs:
     steps:
       - build_command
 
+  publish:
+    docker:
+      - image: circleci/node:10.16.3-browsers
+    parameters:
+      azure_repo_url:
+        type: string
+      environment:
+        type: string
+        default: "dev"
+    steps:
+      - build_command:
+          environment: << parameters.environment >>
+      - run:
+          name: Deploy Develop to Azure
+          command: |
+            USER_EMAIL=$(git log -n 1 --format=%ae $CIRCLE_SHA1)
+            USER_NAME=$(git log -n 1 --format=%cN $CIRCLE_SHA1)
+            cd dist
+            git init
+            git config push.default simple
+            git config user.email "$USER_EMAIL"
+            git config user.name "$USER_NAME"
+            git remote add azure "<< parameters.azure_repo_url >>"
+            git fetch azure
+            if [ `git branch --list -r azure/master` ]; then
+              git reset azure/master
+            fi
+            git add --all
+            git commit -m "Build $CIRCLE_BUILD_NUM" -m "Commit $CIRCLE_SHA1"
+            git push azure master
+
 orbs:
   browser-tools: circleci/browser-tools@1.1.3
