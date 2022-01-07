@@ -116,12 +116,39 @@ workflows:
   version: 2.1
   build_and_deploy:
     jobs:
+      - unit_test
+      # - integration_test
       - build:
+          requires:
+            - unit_test
+            # - integration_test
       - publish:
-          environment: "test"
+          environment: "dev"
           azure_repo_url: $AZURE_REPOSITORY_DEV_URL
           filters:
             branches:
-              only: TEST
+              only: dev
           requires:
+            - unit_test
+            # - integration_test
+            - build
+      - publish:
+          environment: "test"
+          azure_repo_url: $AZURE_REPOSITORY_TEST_URL
+          filters:
+            branches:
+              only: test
+          requires:
+            - unit_test
+            # - integration_test
+            - build
+      - publish:
+          environment: "prod"
+          azure_repo_url: $AZURE_REPOSITORY_PROD_URL
+          filters:
+            branches:
+              only: prod
+          requires:
+            - unit_test
+            # - integration_test
             - build
