@@ -44,7 +44,7 @@ commands:
             - node_modules
       - run:
           name: Create Production Build
-          command: npm run build -- --prod --configuration=<< parameters.environment >> --no-progress
+          command: npm run build -- --prod
 
 jobs:
   build:
