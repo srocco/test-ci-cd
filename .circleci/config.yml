@@ -1,127 +1,57 @@
-version: 2.1
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
 
-commands:
-  update_chrome_command:
-    steps:
-      - browser-tools/install-browser-tools:
-          replace-existing-chrome: true
-      - browser-tools/install-chromedriver
-      - run:
-          command: |
-            google-chrome --version
-            chromedriver --version
-          name: Check install AND update Chrome
-  test_command:
-    steps:
-      - checkout
-      - run:
-          name: Show current branch
-          command: echo ${CIRCLE_BRANCH}
-      - restore_cache:
-          key: v1-dependency-cache-{{ checksum "package.json" }}
-      - run:
-          name: Installing npm dependency
-          command: npm install
-      - save_cache:
-          key: v1-dependency-cache-{{ checksum "package.json" }}
-          paths:
-            - node_modules
-  build_command:
-    parameters:
-      environment:
-        type: string
-        default: dev
-    steps:
-      - checkout
-      - restore_cache:
-          key: v1-dependency-cache-{{ checksum "package.json" }}
-      - run:
-          name: Install Dependencies
-          command: npm install
-      - save_cache:
-          key: v1-dependency-cache-{{ checksum "package.json" }}
-          paths:
-            - node_modules
-      - run:
-          name: Create Production Build
-          command: npm run build -- --prod --configuration=<< parameters.environment >> --no-progress
+name: Build and deploy ASP app to Azure Web App - GenericPaymentPortalWebTest
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
 
 jobs:
-  unit_test:
-    working_directory: ~/test-results
-    docker:
-      - image: circleci/node:10.16.3-browsers
-    steps:
-      - test_command
-      - run:
-          name: Ejecutando test de unidad
-          command: npm run test -- --no-watch --no-progress --browsers=ChromeHeadlessCI
-      - store_test_results:
-          path: ~/test-results/report
-  integration_test:
-    working_directory: ~/my-project
-    docker:
-      - image: circleci/node:10.16.3-browsers
-    steps:
-      - update_chrome_command
-      - test_command
-      - run:
-          name: Ejecutando test de unidad
-          command: |
-            google-chrome --version
-            chromedriver --version
-            npm run e2e -- --protractor-config=e2e/protractor-ci.conf.js
-      - store_test_results:
-          path: ~/report
   build:
-    docker:
-      - image: circleci/node:10.16.3-browsers
-    steps:
-      - build_command
-  publish:
-    docker:
-      - image: circleci/node:10.16.3-browsers
-    parameters:
-      azure_repo_url:
-        type: string
-      environment:
-        type: string
-        default: "dev"
-    steps:
-      - build_command:
-          environment: << parameters.environment >>
-      - run:
-          name: Deploy Develop to Azure
-          command: |
-            USER_EMAIL=$(git log -n 1 --format=%ae $CIRCLE_SHA1)
-            USER_NAME=$(git log -n 1 --format=%cN $CIRCLE_SHA1)
-            cd dist
-            git init
-            git config push.default simple
-            git config user.email "$USER_EMAIL"
-            git config user.name "$USER_NAME"
-            git remote add azure "<< parameters.azure_repo_url >>"
-            git fetch azure
-            if [ `git branch --list -r azure/master` ]; then
-              git reset azure/master
-            fi
-            git add --all
-            git commit -m "Build $CIRCLE_BUILD_NUM" -m "Commit $CIRCLE_SHA1"
-            git push azure master
+    runs-on: windows-latest
 
-orbs:
-  browser-tools: circleci/browser-tools@1.1.3
+    steps:
+      - uses: actions/checkout@v2
 
-workflows:
-  version: 2.1
-  build_and_deploy:
-    jobs:
-      - build:
-      - publish:
-          environment: "test"
-          azure_repo_url: $AZURE_REPOSITORY_DEV_URL
-          filters:
-            branches:
-              only: TEST
-          requires:
-            - build
+      - name: Setup MSBuild path
+        uses: microsoft/setup-msbuild@v1.0.2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v1.0.5
+
+      - name: Restore NuGet packages
+        run: nuget restore
+
+      - name: Publish to folder
+        run: msbuild /nologo /verbosity:m /t:Build /t:pipelinePreDeployCopyAllFilesToOneFolder /p:_PackageTempDir="\published\"
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v2
+        with:
+          name: ASP-app
+          path: "/published/**"
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+    environment:
+      name: "Production"
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v2
+        with:
+          name: ASP-app
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "GenericPaymentPortalWebTest"
+          slot-name: "Production"
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_23B12988EE854AC5BA07052E3375B091 }}
+          package: .
